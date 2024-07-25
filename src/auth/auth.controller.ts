@@ -8,7 +8,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('/local/signup')
-  signUpLocal(@Body() dto: AuthDto) {
+  signUpLocal(@Body() dto: AuthDto): Promise<Tokens> {
     this.authService.signUpLocal(dto);
   }
 

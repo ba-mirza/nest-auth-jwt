@@ -12,9 +12,9 @@ export class AuthService {
     return await bcrypt.hash(data, 10);
   }
 
-  async signUpLocal(dto: AuthDto) {
+  async signUpLocal(dto: AuthDto): Promise<Tokens> {
     const hashed = await this.hashData(dto.password);
-    const newUser = this.prismaService.user.create({
+    const newUser = await this.prismaService.user.create({
       data: {
         email: dto.email,
         hash: hashed,
