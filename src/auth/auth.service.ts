@@ -1,5 +1,5 @@
 import { PrismaService } from './../prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { AuthDto } from './dto';
 import * as bcrypt from 'bcrypt';
 import { Tokens } from './types';
@@ -11,6 +11,42 @@ export class AuthService {
     private prismaService: PrismaService,
     private jwtService: JwtService,
   ) {}
+
+  async signUpLocal(dto: AuthDto): Promise<Tokens> {
+    const hashed = await this.hashData(dto.password);
+    const newUser = await this.prismaService.user.create({
+      data: {
+        email: dto.email,
+        hash: hashed,
+      }
+    });
+
+    const tokens = await this.getTokens(newUser.id, newUser.email);
+    await this.updateRtHash(newUser.id, tokens.refresh_token);
+    
+    return tokens;
+  }
+
+  async signInLocal(dto: AuthDto): Promise<Tokens> {
+    const isUser = await this.prismaService.user.findUnique({
+      where: {
+        email: dto.email
+      }
+    });
+
+    const passwordMatches = await bcrypt.compare(dto.password, isUser.hash);
+    
+    if(!isUser && !passwordMatches) throw new ForbiddenException("Access Denied");
+
+    const tokens = await this.getTokens(isUser.id, isUser.email);
+    await this.updateRtHash(isUser.id, tokens.refresh_token);
+    
+    return tokens;
+  }
+
+  logout() {}
+
+  refreshTokens() {}
 
   async hashData(data: string) {
     return await bcrypt.hash(data, 10);
@@ -46,21 +82,6 @@ export class AuthService {
     }
   }
 
-  async signUpLocal(dto: AuthDto): Promise<Tokens> {
-    const hashed = await this.hashData(dto.password);
-    const newUser = await this.prismaService.user.create({
-      data: {
-        email: dto.email,
-        hash: hashed,
-      }
-    });
-
-    const tokens = await this.getTokens(newUser.id, newUser.email);
-    await this.updateRtHash(newUser.id, tokens.refresh_token);
-    
-    return tokens;
-  }
-
   async updateRtHash(userId: number, rt: string) {
     const hash = await this.hashData(rt);
     await this.prismaService.user.update({
@@ -72,10 +93,4 @@ export class AuthService {
       }
     })
   }
-
-  signInLocal() {}
-
-  logout() {}
-
-  refreshTokens() {}
 }
